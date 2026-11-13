@@ -94,6 +94,9 @@ jobs:
     needs: fetch
     name: ${{ matrix.os }} ${{ matrix.python }}
     runs-on: ${{ matrix.os }}
+    # A healthy run takes a few minutes. The tests kill hung children after
+    # 120 seconds, and this bounds anything they miss.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -136,3 +139,22 @@ jobs:
         run: |
           if [ -x .venv/bin/python ]; then py=.venv/bin/python; else py=.venv/Scripts/python.exe; fi
           "$py" -m pytest -v -s -p no:cacheprovider tests
+
+      # macOS writes a report with the native backtrace of every crashed
+      # process. Only reports from Python processes are kept.
+      - name: Collect macOS crash reports
+        if: always() && runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p crash-reports
+          for dir in "$HOME/Library/Logs/DiagnosticReports" /Library/Logs/DiagnosticReports; do
+            find "$dir" -maxdepth 1 \( -name 'python*' -o -name 'Python*' \) -newer .venv -exec cp {} crash-reports/ \; 2>/dev/null || true
+          done
+          ls -l crash-reports
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && runner.os == 'macOS'
+        with:
+          name: crash-reports-${{ matrix.os }}-${{ matrix.python }}
+          path: crash-reports/
+          if-no-files-found: ignore

@@ -1,5 +1,6 @@
 """A one-sheet workbook built in memory, and the calculations the smoke tests run on it."""
 
+import faulthandler
 import io
 import zipfile
 
@@ -66,6 +67,11 @@ def calculate_in_child(x):
     """Build a calculator in the current process and return B1 and C1 for A1 = x.
 
     A child process started with spawn imports this module by name, so the
-    function must live at module level.
+    function must live at module level. A child that is still running after
+    100 seconds writes its Python stack to stderr.
     """
-    return calculate(rx.build_calculator(workbook()), x)
+    faulthandler.dump_traceback_later(100)
+    try:
+        return calculate(rx.build_calculator(workbook()), x)
+    finally:
+        faulthandler.cancel_dump_traceback_later()
