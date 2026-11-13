@@ -15,6 +15,10 @@
 # setup-uv installs a pinned uv.
 name: smoke
 
+# The run title carries the dispatch id, so a caller that sends a repository_dispatch
+# finds its own run by the title. client_payload takes version, source and id.
+run-name: smoke ${{ github.event.inputs.version || github.event.client_payload.version }} ${{ github.event.client_payload.id }}
+
 on:
   workflow_dispatch:
     inputs:
