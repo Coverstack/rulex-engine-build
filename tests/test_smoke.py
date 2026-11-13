@@ -7,6 +7,8 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
+import threading
+import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 
 import pytest
@@ -99,6 +101,36 @@ def test_child_processes(method):
     # Earlier tests leave this process with engine state and parked worker
     # threads, so a fork here copies a process that has used the engine.
     assert run_in_children(method, range(200)) == [expected(x) for x in range(200)]
+
+
+@pytest.mark.skipif(
+    "fork" not in multiprocessing.get_all_start_methods(), reason="no fork"
+)
+def test_fork_while_other_threads_calculate():
+    # Four threads calculate on one shared calculator while this process forks
+    # its children, so some forks land while a calculation is in flight.
+    calc = rx.build_calculator(workbook())
+    stop = threading.Event()
+
+    def spin():
+        x = 0
+        while not stop.is_set():
+            calculate(calc, x % 100)
+            x += 1
+
+    threads = [threading.Thread(target=spin) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    try:
+        with warnings.catch_warnings():
+            # Python 3.12 and later warn about a fork while threads run.
+            warnings.simplefilter("ignore", DeprecationWarning)
+            got = run_in_children("fork", range(50))
+        assert got == [expected(x) for x in range(50)]
+    finally:
+        stop.set()
+        for thread in threads:
+            thread.join()
 
 
 @pytest.mark.skipif(
