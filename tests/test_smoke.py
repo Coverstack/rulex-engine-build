@@ -1,8 +1,11 @@
-"""Smoke tests for an installed rulex-engine wheel on its own OS and architecture."""
+"""Smoke tests for an installed rulex-engine wheel on its own OS and architecture.
+
+This file and smoke_workbook.py are self-contained, with no conftest fixtures,
+so the macOS and Windows test runners can run the same files unchanged.
+"""
 
 import concurrent.futures
 import multiprocessing
-import os
 import subprocess
 import sys
 import sysconfig
@@ -10,10 +13,12 @@ import tempfile
 import threading
 import warnings
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from pathlib import Path
 
 import pytest
+
 import rulex_engine as rx
-from workbook import A1, B1, calculate, calculate_in_child, expected, workbook
+from smoke_workbook import A1, B1, calculate, calculate_in_child, expected, workbook
 
 # Seconds a child process gets for its share of the work before it counts as hung.
 CHILD_TIMEOUT = 120
@@ -47,21 +52,20 @@ def print_native_stacks(pid):
     if sys.platform != "darwin":
         return
     with tempfile.TemporaryDirectory() as tmp:
-        report = os.path.join(tmp, "sample.txt")
-        subprocess.run(
-            ["/usr/bin/sample", str(pid), "3", "-mayDie", "-file", report],
+        report = Path(tmp) / "sample.txt"
+        subprocess.run(  # noqa: S603 - a fixed system tool and a pid
+            ["/usr/bin/sample", str(pid), "3", "-mayDie", "-file", str(report)],
             capture_output=True,
             check=False,
         )
-        if os.path.exists(report):
-            with open(report) as f:
-                print(f"--- native stacks of hung child {pid}\n{f.read()}")
+        if report.exists():
+            print(f"--- native stacks of hung child {pid}\n{report.read_text()}")  # noqa: T201
 
 
 def test_reports_platform():
     gil = getattr(sys, "_is_gil_enabled", lambda: True)()
-    print(f"python {sys.version.split()[0]} {sysconfig.get_platform()} gil={gil}")
-    print(f"rulex-engine {rx.__file__}")
+    print(f"python {sys.version.split()[0]} {sysconfig.get_platform()} gil={gil}")  # noqa: T201
+    print(f"rulex-engine {rx.__file__}")  # noqa: T201
 
 
 def test_build_and_run():
@@ -104,7 +108,8 @@ def test_child_processes(method):
 
 
 @pytest.mark.skipif(
-    "fork" not in multiprocessing.get_all_start_methods(), reason="no fork"
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="no fork",
 )
 def test_fork_while_other_threads_calculate():
     # Four threads calculate on one shared calculator while this process forks
@@ -134,7 +139,8 @@ def test_fork_while_other_threads_calculate():
 
 
 @pytest.mark.skipif(
-    "fork" not in multiprocessing.get_all_start_methods(), reason="no fork"
+    "fork" not in multiprocessing.get_all_start_methods(),
+    reason="no fork",
 )
 def test_fork_from_a_process_that_never_calculated():
     # The parent only imports the package before it forks, so no engine thread
@@ -143,7 +149,7 @@ def test_fork_from_a_process_that_never_calculated():
         "import multiprocessing as mp\n"
         "from concurrent.futures import ProcessPoolExecutor\n"
         "import rulex_engine\n"
-        "from workbook import calculate_in_child, expected\n"
+        "from smoke_workbook import calculate_in_child, expected\n"
         "if __name__ == '__main__':\n"
         "    ctx = mp.get_context('fork')\n"
         "    with ProcessPoolExecutor(2, mp_context=ctx) as pool:\n"
@@ -151,14 +157,15 @@ def test_fork_from_a_process_that_never_calculated():
         "    assert got == [expected(x) for x in range(20)], got\n"
         "    print('fresh fork ok')\n"
     )
-    done = subprocess.run(
+    done = subprocess.run(  # noqa: S603 - this interpreter and a fixed script
         [sys.executable, "-c", code],
-        cwd=os.path.dirname(__file__),
+        cwd=Path(__file__).parent,
         capture_output=True,
         text=True,
         timeout=CHILD_TIMEOUT,
+        check=False,
     )
-    print(done.stdout, done.stderr)
+    print(done.stdout, done.stderr)  # noqa: T201
     assert done.returncode == 0
 
 

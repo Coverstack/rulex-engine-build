@@ -1,4 +1,4 @@
-"""A one-sheet workbook built in memory, and the calculations the smoke tests run on it."""
+"""A one-sheet workbook built in memory, and the calculations the smoke tests run."""
 
 import faulthandler
 import io
@@ -6,34 +6,43 @@ import zipfile
 
 import rulex_engine as rx
 
+MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+PACKAGE = "http://schemas.openxmlformats.org/package/2006"
+RELS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+SPREADSHEETML = "application/vnd.openxmlformats-officedocument.spreadsheetml"
+
 # Sheet "Calc" holds 2 in A1, =A1*21 in B1 and =SUM(A1:B1)&"x" in C1.
 SHEET = (
-    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    f'<worksheet xmlns="{MAIN}">'
     '<sheetData><row r="1"><c r="A1"><v>2</v></c><c r="B1"><f>A1*21</f></c>'
     '<c r="C1"><f>SUM(A1:B1)&amp;"x"</f></c></row></sheetData></worksheet>'
 )
 PARTS = {
     "[Content_Types].xml": (
-        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        f'<Types xmlns="{PACKAGE}/content-types">'
+        '<Default Extension="rels"'
+        ' ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
         '<Default Extension="xml" ContentType="application/xml"/>'
-        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        '<Override PartName="/xl/workbook.xml"'
+        f' ContentType="{SPREADSHEETML}.sheet.main+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml"'
+        f' ContentType="{SPREADSHEETML}.worksheet+xml"/>'
         "</Types>"
     ),
     "_rels/.rels": (
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        f'<Relationships xmlns="{PACKAGE}/relationships">'
+        f'<Relationship Id="rId1" Type="{RELS}/officeDocument"'
+        ' Target="xl/workbook.xml"/>'
         "</Relationships>"
     ),
     "xl/workbook.xml": (
-        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
-        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        f'<workbook xmlns="{MAIN}" xmlns:r="{RELS}">'
         '<sheets><sheet name="Calc" sheetId="1" r:id="rId1"/></sheets></workbook>'
     ),
     "xl/_rels/workbook.xml.rels": (
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        f'<Relationships xmlns="{PACKAGE}/relationships">'
+        f'<Relationship Id="rId1" Type="{RELS}/worksheet"'
+        ' Target="worksheets/sheet1.xml"/>'
         "</Relationships>"
     ),
     "xl/worksheets/sheet1.xml": SHEET,
